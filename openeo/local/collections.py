@@ -1,13 +1,33 @@
 import logging
 from pathlib import Path
-from typing import List
+from typing import Any, Callable, Dict, List, Optional
 
 import rioxarray
 import xarray as xr
 from pyproj import Transformer
 
+# type: (Path) -> Optional[dict]
+LocalCollectionHandler = Callable[[Path], Optional[dict]]
+
+_LOCAL_COLLECTION_HANDLERS: List[LocalCollectionHandler] = []
+
 _log = logging.getLogger(__name__)
 
+def register_local_collection_handler(handler: LocalCollectionHandler) -> None:
+    """
+    Register a custom handler for local collections.
+
+    The handler is called with a Path and must either:
+
+      * return a STAC-like collection metadata dict (id, extent, cube:dimensions, ...)
+        when it "recognizes" the path, or
+      * return None when it does not handle the given path.
+
+    Handlers are tried in registration order. On the first non-None result,
+    the returned metadata is added to the local collections list and no
+    further handlers are tried for that path.
+    """
+    _LOCAL_COLLECTION_HANDLERS.append(handler)
 
 def _get_dimension(dims: dict, candidates: List[str]):
     for name in candidates:
@@ -215,11 +235,32 @@ def _get_geotiff_metadata(file_path):
 
 
 def _get_local_collections(local_collections_path):
-    if isinstance(local_collections_path,str):
+    if isinstance(local_collections_path, str):
         local_collections_path = [local_collections_path]
+
     local_collections_list = []
+
     for flds in local_collections_path:
-        local_collections_netcdf_zarr = [p for p in Path(flds).rglob('*') if p.suffix in  ['.nc','.zarr']]
+        root = Path(flds)
+
+        # 1) Give registered handlers a first shot at any path in the tree.
+        if _LOCAL_COLLECTION_HANDLERS:
+            for p in root.rglob("*"):
+                # Skip directories/files we already deal with explicitly below
+                if p.suffix in [".nc", ".zarr", ".tif", ".tiff"]:
+                    continue
+                for handler in _LOCAL_COLLECTION_HANDLERS:
+                    try:
+                        meta = handler(p)
+                    except Exception as e:
+                        _log.error("Error in local collection handler %r for %s: %s", handler, p, e)
+                        meta = None
+                    if meta:
+                        local_collections_list.append(meta)
+                        break  # don't call other handlers for this path
+
+        # 2) Existing NetCDF/Zarr logic (unchanged)
+        local_collections_netcdf_zarr = [p for p in root.rglob("*") if p.suffix in [".nc", ".zarr"]]
         for local_file in local_collections_netcdf_zarr:
             try:
                 metadata = _get_netcdf_zarr_metadata(local_file)
@@ -227,7 +268,9 @@ def _get_local_collections(local_collections_path):
             except Exception as e:
                 _log.error(e)
                 continue
-        local_collections_geotiffs = [p for p in Path(flds).rglob('*') if p.suffix in  ['.tif','.tiff']]
+
+        # 3) Existing GeoTIFF logic (unchanged)
+        local_collections_geotiffs = [p for p in root.rglob("*") if p.suffix in [".tif", ".tiff"]]
         for local_file in local_collections_geotiffs:
             try:
                 metadata = _get_geotiff_metadata(local_file)
@@ -235,6 +278,5 @@ def _get_local_collections(local_collections_path):
             except Exception as e:
                 _log.error(e)
                 continue
-    local_collections_dict = {'collections':local_collections_list}
 
-    return local_collections_dict
+    return {"collections": local_collections_list}
