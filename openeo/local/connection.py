@@ -15,6 +15,7 @@ from openeo.local.collections import (
     _get_geotiff_metadata,
     _get_local_collections,
     _get_netcdf_zarr_metadata,
+    _LOCAL_COLLECTION_HANDLERS as COLLECTION_HANDLERS,
 )
 from openeo.local.processing import PROCESS_REGISTRY
 from openeo.metadata import (
@@ -53,23 +54,55 @@ class LocalConnection():
         data = _get_local_collections(self.local_collections_path)["collections"]
         return VisualList("collections", data=data)
 
-    def describe_collection(self, collection_id: str) -> dict:
+    def describe_collection(self, collection_id):
         """
-        Get full collection metadata for given collection id.
+        Describe a local collection by collection ID (typically: file path).
 
-        .. seealso::
-
-            :py:meth:`~openeo.rest.connection.Connection.list_collection_ids`
-            to list all collection ids provided by the back-end.
-
-        :param collection_id: collection id
-        :return: collection metadata.
+        For local mode we support:
+        - custom handler-based collections (e.g. .SEN3 SAFE directories)
+        - NetCDF/Zarr files
+        - GeoTIFF files
         """
         local_collection = Path(collection_id)
-        if '.nc' in local_collection.suffixes or '.zarr' in local_collection.suffixes:
-            data = _get_netcdf_zarr_metadata(local_collection)
-        elif '.tif' in local_collection.suffixes or '.tiff' in local_collection.suffixes:
-            data = _get_geotiff_metadata(local_collection)
+
+        # 0) Try handler-based discovery first (e.g. plugin .SEN3 metadata)
+        for handler in COLLECTION_HANDLERS:
+            try:
+                meta = handler(local_collection)
+            except Exception as e:
+                _log.error(
+                    "Error in local collection handler %r for %s: %s",
+                    handler,
+                    local_collection,
+                    e,
+                )
+                meta = None
+            if meta:
+                return VisualDict("collection", data=meta)
+
+        # 1) Fallback to built-in metadata derivation
+        data = None
+
+        if ".zarr" in local_collection.suffixes or ".nc" in local_collection.suffixes:
+            try:
+                data = _get_netcdf_zarr_metadata(local_collection)
+            except Exception as e:
+                _log.error("Error creating NetCDF/Zarr metadata for %s: %s", local_collection, e)
+
+        elif (
+            ".tif" in local_collection.suffixes
+            or ".tiff" in local_collection.suffixes
+        ):
+            try:
+                data = _get_geotiff_metadata(local_collection)
+            except Exception as e:
+                _log.error("Error creating GeoTIFF metadata for %s: %s", local_collection, e)
+
+        if data is None:
+            raise ValueError(
+                f"Unsupported local collection type or no metadata could be derived for {local_collection!s}"
+            )
+
         return VisualDict("collection", data=data)
 
     def collection_metadata(self, name) -> CollectionMetadata:
