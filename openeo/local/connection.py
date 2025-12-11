@@ -11,11 +11,11 @@ from openeo_processes_dask.process_implementations.cubes import load_stac
 
 from openeo.internal.graph_building import PGNode, as_flat_graph
 from openeo.internal.jupyter import VisualDict, VisualList
+from openeo.local.collections import _LOCAL_COLLECTION_HANDLERS as COLLECTION_HANDLERS
 from openeo.local.collections import (
     _get_geotiff_metadata,
     _get_local_collections,
     _get_netcdf_zarr_metadata,
-    _LOCAL_COLLECTION_HANDLERS as COLLECTION_HANDLERS,
 )
 from openeo.local.processing import PROCESS_REGISTRY
 from openeo.metadata import (
