@@ -243,24 +243,39 @@ def _get_local_collections(local_collections_path):
     for flds in local_collections_path:
         root = Path(flds)
 
-        # 1) Give registered handlers a first shot at any path in the tree.
         if _LOCAL_COLLECTION_HANDLERS:
             for p in root.rglob("*"):
-                # Skip directories/files we already deal with explicitly below
-                if p.suffix in [".nc", ".zarr", ".tif", ".tiff"]:
-                    continue
+
+                # Skip any file or folder *inside* a .SEN3 SAFE directory,
+                # unless the directory itself (ending in .SEN3).
+                if any(parent.suffix == ".SEN3" for parent in p.parents):
+                    if p.is_file():
+                        continue
+                    if p.is_dir() and p.suffix != ".SEN3":
+                        continue
+
+                # Let plugin handlers try to interpret the path
                 for handler in _LOCAL_COLLECTION_HANDLERS:
                     try:
                         meta = handler(p)
-                    except Exception as e:
-                        _log.error("Error in local collection handler %r for %s: %s", handler, p, e)
+                    except Exception:
                         meta = None
-                    if meta:
-                        local_collections_list.append(meta)
-                        break  # don't call other handlers for this path
 
-        # 2) Existing NetCDF/Zarr logic (unchanged)
-        local_collections_netcdf_zarr = [p for p in root.rglob("*") if p.suffix in [".nc", ".zarr"]]
+                    # Handler returned a collection
+                    if isinstance(meta, dict):
+                        # Don’t add internal skip markers
+                        if "_skip" not in meta:
+                            local_collections_list.append(meta)
+                        break
+
+        local_collections_netcdf_zarr = [
+            p
+            for p in root.rglob("*")
+            if p.suffix in [".nc", ".zarr"]
+            # EXCLUDE internal SAFE files
+            and not any(parent.suffix == ".SEN3" for parent in p.parents)
+        ]
+
         for local_file in local_collections_netcdf_zarr:
             try:
                 metadata = _get_netcdf_zarr_metadata(local_file)
@@ -269,8 +284,14 @@ def _get_local_collections(local_collections_path):
                 _log.error(e)
                 continue
 
-        # 3) Existing GeoTIFF logic (unchanged)
-        local_collections_geotiffs = [p for p in root.rglob("*") if p.suffix in [".tif", ".tiff"]]
+        local_collections_geotiffs = [
+            p
+            for p in root.rglob("*")
+            if p.suffix in [".tif", ".tiff"]
+            # EXCLUDE internal SAFE files
+            and not any(parent.suffix == ".SEN3" for parent in p.parents)
+        ]
+
         for local_file in local_collections_geotiffs:
             try:
                 metadata = _get_geotiff_metadata(local_file)
