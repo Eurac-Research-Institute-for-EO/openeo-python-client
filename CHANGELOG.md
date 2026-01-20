@@ -9,15 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `MultiBackendJobManager`: add `download_results` option to enable/disable the automated download of job results once completed by the job manager ([#744](https://github.com/Open-EO/openeo-python-client/issues/744))
+- Official support for Python 3.14 (include Python 3.14 in unit test matrix on GitHub Actions) ([#801](https://github.com/Open-EO/openeo-python-client/issues/801))
 
 ### Changed
-
-- Internal reorganization of `openeo.extra.job_management` submodule to ease future development ([#741](https://github.com/Open-EO/openeo-python-client/issues/741))
 
 ### Removed
 
 ### Fixed
+
+- Guard STAC metadata parsing against invalid "item_assets" usage ([#853](https://github.com/Open-EO/openeo-python-client/issues/853))
+
+
+## [0.47.0] - 2025-12-17
+
+### Added
+
+- `MultiBackendJobManager`: add `download_results` option to enable/disable the automated download of job results once completed by the job manager ([#744](https://github.com/Open-EO/openeo-python-client/issues/744))
+- Support UDF based spatial and temporal extents in `load_collection`, `load_stac` and `filter_temporal` ([#831](https://github.com/Open-EO/openeo-python-client/pull/831))
+- `MultiBackendJobManager`: keep number of "queued" jobs below 10 for better CDSE compatibility ([#839](https://github.com/Open-EO/openeo-python-client/pull/839), eu-cdse/openeo-cdse-infra#859)
+
+### Changed
+
+- Internal reorganization of `openeo.extra.job_management` submodule to ease future development ([#741](https://github.com/Open-EO/openeo-python-client/issues/741))
+- `openeo.Connection`: add some more HTTP error codes to the default retry list: `502 Bad Gateway`, `503 Service Unavailable` and `504 Gateway Timeout` ([#835](https://github.com/Open-EO/openeo-python-client/issues/835))
+
+### Removed
+
+- Remove `Connection.load_disk_collection` (wrapper for non-standard `load_disk_data` process), deprecated since version 0.25.0 (related to [Open-EO/openeo-geopyspark-driver#1457](https://github.com/Open-EO/openeo-geopyspark-driver/issues/1457))
 
 
 ## [0.46.0] - 2025-10-31
