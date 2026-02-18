@@ -9,15 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Official support for Python 3.14 (include Python 3.14 in unit test matrix on GitHub Actions) ([#801](https://github.com/Open-EO/openeo-python-client/issues/801))
-
 ### Changed
 
 ### Removed
 
 ### Fixed
 
+## [0.48.0] - 2026-02-17
+
+### Added
+
+- Official support for Python 3.14 (include Python 3.14 in unit test matrix on GitHub Actions) ([#801](https://github.com/Open-EO/openeo-python-client/issues/801))
+- Add `on_response_headers_sync` option to  `openeo.connect`/`Connection` to set default `on_response_headers` handler for sync requests at connection level.
+
+### Changed
+
+- Harden STAC parsing of "bands"/"eo:bands" when "name" field is not present (which is technically not a required field) ([#860](https://github.com/Open-EO/openeo-python-client/issues/860))
+- `openeo.rest.conversions.timeseries_json_to_pandas`: allow timeseries to be given as a raw JSON dump or path to JSON file.
+
+### Fixed
+
 - Guard STAC metadata parsing against invalid "item_assets" usage ([#853](https://github.com/Open-EO/openeo-python-client/issues/853))
+- `openeo.testing.results`: only do `pixel_tolerance` check on numerical data ([#864](https://github.com/Open-EO/openeo-python-client/issues/864))
 
 
 ## [0.47.0] - 2025-12-17
