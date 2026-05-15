@@ -8,6 +8,7 @@ import rioxarray
 import xarray as xr
 from openeo_pg_parser_networkx import ProcessRegistry
 from openeo_pg_parser_networkx.process_registry import Process
+from openeo_processes_dask.process_implementations.cubes import load
 from openeo_processes_dask.process_implementations.core import process
 
 _log = logging.getLogger(__name__)
@@ -44,13 +45,11 @@ def init_process_registry():
 
 PROCESS_REGISTRY = init_process_registry()
 
-# load_stac resolves dynamically through the module to support defair monkey-patch
-import openeo_processes_dask.process_implementations.cubes.load as _cubes_load
-
+# Resolve load_stac at call time so monkey-patches on the implementation module are honored.
 if "load_stac" in PROCESS_REGISTRY:
     PROCESS_REGISTRY["load_stac"] = Process(
         spec=PROCESS_REGISTRY["load_stac"].spec,
-        implementation=lambda *args, **kwargs: _cubes_load.load_stac(*args, **kwargs),
+        implementation=lambda *args, **kwargs: load.load_stac(*args, **kwargs),
     )
 
 

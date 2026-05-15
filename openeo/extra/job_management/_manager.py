@@ -30,9 +30,9 @@ import openeo.extra.job_management._job_db
 from openeo import BatchJob, Connection
 from openeo.extra.job_management._interface import JobDatabaseInterface
 from openeo.extra.job_management._thread_worker import (
-    _JobDownloadTask,
     _JobManagerWorkerThreadPool,
     _JobStartTask,
+    _JobDownloadTask
 )
 from openeo.rest import OpenEoApiError
 from openeo.rest.auth.auth import BearerAuth
@@ -512,11 +512,16 @@ class MultiBackendJobManager:
 
         self._worker_pool = _JobManagerWorkerThreadPool()
 
-        while sum(
-            job_db.count_by_status(
-                statuses=["not_started", "created", "queued_for_start", "queued", "running"]
-            ).values()
-        ) > 0 or (self._worker_pool is not None and self._worker_pool.has_unprocessed_tasks()):
+
+        while (
+            sum(
+                job_db.count_by_status(
+                    statuses=["not_started", "created", "queued_for_start", "queued", "running"]
+                ).values()) > 0
+
+            or (self._worker_pool is not None and self._worker_pool.has_unprocessed_tasks()) 
+                
+        ):
             self._job_update_loop(job_db=job_db, start_job=start_job, stats=stats)
             stats["run_jobs loop"] += 1
 
@@ -525,6 +530,8 @@ class MultiBackendJobManager:
             time.sleep(self.poll_sleep)
             stats["sleep"] += 1
 
+
+       
         self._worker_pool.shutdown()
         self._worker_pool = None
 
@@ -574,7 +581,7 @@ class MultiBackendJobManager:
 
         if self._worker_pool is not None:
             self._process_threadworker_updates(worker_pool=self._worker_pool, job_db=job_db, stats=stats)
-
+            
 
         # TODO: move this back closer to the `_track_statuses` call above, once job done/error handling is also handled in threads?
         for job, row in jobs_done:
@@ -751,19 +758,19 @@ class MultiBackendJobManager:
             #Proactively refresh bearer token
             job_con =  job.connection
             self._refresh_bearer_token(connection=job_con)
-
+            
             task = _JobDownloadTask(
                 job_id=job.job_id,
-                df_idx=row.name,
+                df_idx=row.name, 
                 root_url=job_con.root_url,
                 bearer_token=job_con.auth.bearer if isinstance(job_con.auth, BearerAuth) else None,
                 download_dir=job_dir,
             )
             _log.info(f"Submitting download task {task} to download thread pool")
-
+            
             if self._worker_pool is None:
                 self._worker_pool = _JobManagerWorkerThreadPool()
-
+                
             self._worker_pool.submit_task(task=task, pool_name="job_download")
 
     def on_job_error(self, job: BatchJob, row):

@@ -24,6 +24,25 @@ def test_local_collection_metadata(tmp_path_factory):
 @pytest.mark.skipif(
     not LocalConnection, reason="environment does not support localprocessing"
 )
+def test_load_stac_registry_honors_monkeypatch(monkeypatch):
+    from openeo.local.processing import PROCESS_REGISTRY
+    from openeo_processes_dask.process_implementations.cubes import load
+
+    sentinel = object()
+
+    def patched_load_stac(*args, **kwargs):
+        assert args == ()
+        assert kwargs == {'url': 'https://example.test/catalog'}
+        return sentinel
+
+    monkeypatch.setattr(load, 'load_stac', patched_load_stac)
+
+    assert PROCESS_REGISTRY['load_stac'].implementation(url='https://example.test/catalog') is sentinel
+
+
+@pytest.mark.skipif(
+    not LocalConnection, reason="environment does not support localprocessing"
+)
 def test_load_local_collection_returns_dataset(tmp_path_factory):
     """load_local_collection returns Dataset for NetCDF files."""
     from openeo.local.processing import load_local_collection
