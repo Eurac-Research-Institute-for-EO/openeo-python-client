@@ -46,6 +46,7 @@ PROCESS_REGISTRY = init_process_registry()
 
 # load_stac resolves dynamically through the module to support defair monkey-patch
 import openeo_processes_dask.process_implementations.cubes.load as _cubes_load
+
 if "load_stac" in PROCESS_REGISTRY:
     PROCESS_REGISTRY["load_stac"] = Process(
         spec=PROCESS_REGISTRY["load_stac"].spec,
