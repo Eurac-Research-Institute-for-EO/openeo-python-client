@@ -245,8 +245,12 @@ class LocalConnection():
                 SpatialDimension(name=xarray_cube.openeo.y_dim, extent=[]),
                 TemporalDimension(name=xarray_cube.openeo.temporal_dims[0], extent=[]),
                 BandDimension(
-                    name="bands",
-                    bands=[Band(name=x) for x in xarray_cube.data_vars],
+                    name=xarray_cube.openeo.band_dims[0] if isinstance(xarray_cube, xr.DataArray) else "bands",
+                    bands=[Band(name=x) for x in (
+                        xarray_cube[xarray_cube.openeo.band_dims[0]].values
+                        if isinstance(xarray_cube, xr.DataArray)
+                        else xarray_cube.data_vars
+                    )],
                 ),
             ],
         )
@@ -270,9 +274,9 @@ class LocalConnection():
         *,
         validate: Optional[bool] = None,
         auto_decode: bool = True,
-    ) -> xr.Dataset:
+    ) -> Union[xr.Dataset, xr.DataArray]:
         """
-        Execute locally the process graph and return the result as an xarray.Dataset.
+        Execute locally the process graph and return the result as an xarray Dataset or DataArray.
 
         :param process_graph: (flat) dict representing a process graph, or process graph as raw JSON string,
         :return: a datacube containing the requested data
