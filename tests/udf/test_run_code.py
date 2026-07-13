@@ -329,6 +329,7 @@ def test_run_local_udf_from_file_netcdf_with_context(tmp_path):
     assert result.shape == (3, 2, 6, 5)
     swapped_result = result.transpose("t", "bands", "x", "y")
     expected = xdc.array * factor
+    expected["t"] = expected["t"].astype(swapped_result["t"].dtype)
     xarray.testing.assert_equal(swapped_result, expected)
 
 
