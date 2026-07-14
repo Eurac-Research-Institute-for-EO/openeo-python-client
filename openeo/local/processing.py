@@ -8,6 +8,7 @@ import rioxarray
 import xarray as xr
 from openeo_pg_parser_networkx import ProcessRegistry
 from openeo_pg_parser_networkx.process_registry import Process
+from openeo_processes_dask.process_implementations.cubes import load
 from openeo_processes_dask.process_implementations.core import process
 
 _log = logging.getLogger(__name__)
@@ -44,6 +45,13 @@ def init_process_registry():
 
 PROCESS_REGISTRY = init_process_registry()
 
+# Resolve load_stac at call time so monkey-patches on the implementation module are honored.
+if "load_stac" in PROCESS_REGISTRY:
+    PROCESS_REGISTRY["load_stac"] = Process(
+        spec=PROCESS_REGISTRY["load_stac"].spec,
+        implementation=lambda *args, **kwargs: load.load_stac(*args, **kwargs),
+    )
+
 
 def load_local_collection(*args, **kwargs):
     pretty_args = {k: repr(v)[:80] for k, v in kwargs.items()}
@@ -62,16 +70,15 @@ def load_local_collection(*args, **kwargs):
                 crs = data.crs.attrs['spatial_ref']
             elif 'crs_wkt' in data.crs.attrs:
                 crs = data.crs.attrs['crs_wkt']
-        data = data.to_array(dim='bands')
         if crs is not None:
-            data.rio.write_crs(crs,inplace=True)
+            for var in data.data_vars:
+                data[var].rio.write_crs(crs, inplace=True)
     elif '.tiff' in collection.suffixes or '.tif' in collection.suffixes:
         data = rioxarray.open_rasterio(kwargs['id'],chunks={},band_as_variable=True)
-        for d in data.data_vars:
+        for d in list(data.data_vars):
             descriptions = [v for k, v in data[d].attrs.items() if k.lower() == "description"]
             if descriptions:
                 data = data.rename({d: descriptions[0]})
-        data = data.to_array(dim='bands')
     return data
 
 PROCESS_REGISTRY["load_collection"] = Process(

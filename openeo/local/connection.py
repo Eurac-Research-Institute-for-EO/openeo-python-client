@@ -7,7 +7,7 @@ import numpy as np
 import xarray as xr
 from openeo_pg_parser_networkx.graph import OpenEOProcessGraph
 from openeo_pg_parser_networkx.pg_schema import BoundingBox, TemporalInterval
-from openeo_processes_dask.process_implementations.cubes import load_stac
+from openeo_processes_dask.process_implementations.cubes import load
 
 from openeo.internal.graph_building import PGNode, as_flat_graph
 from openeo.internal.jupyter import VisualDict, VisualList
@@ -232,12 +232,18 @@ class LocalConnection():
             arguments["spatial_extent"] = BoundingBox.parse_obj(spatial_extent)
         if temporal_extent is not None:
             arguments["temporal_extent"] = TemporalInterval.parse_obj(temporal_extent)
-        xarray_cube = load_stac(**arguments)
+        xarray_cube = load.load_stac(**arguments)
         attrs = xarray_cube.attrs
         for at in attrs:
             # allowed types: str, Number, ndarray, number, list, tuple
             if not isinstance(attrs[at], (int, float, str, np.ndarray, list, tuple)):
                 attrs[at] = str(attrs[at])
+        if isinstance(xarray_cube, xr.DataArray):
+            band_dimension = xarray_cube.openeo.band_dims[0]
+            bands = xarray_cube[band_dimension].values
+        else:
+            band_dimension = "bands"
+            bands = xarray_cube.data_vars
         metadata = CollectionMetadata(
             attrs,
             dimensions=[
@@ -245,8 +251,8 @@ class LocalConnection():
                 SpatialDimension(name=xarray_cube.openeo.y_dim, extent=[]),
                 TemporalDimension(name=xarray_cube.openeo.temporal_dims[0], extent=[]),
                 BandDimension(
-                    name=xarray_cube.openeo.band_dims[0],
-                    bands=[Band(name=x) for x in xarray_cube[xarray_cube.openeo.band_dims[0]].values],
+                    name=band_dimension,
+                    bands=[Band(name=x) for x in bands],
                 ),
             ],
         )
@@ -270,9 +276,9 @@ class LocalConnection():
         *,
         validate: Optional[bool] = None,
         auto_decode: bool = True,
-    ) -> xr.DataArray:
+    ) -> Union[xr.Dataset, xr.DataArray]:
         """
-        Execute locally the process graph and return the result as an xarray.DataArray.
+        Execute locally the process graph and return the result as an xarray Dataset or DataArray.
 
         :param process_graph: (flat) dict representing a process graph, or process graph as raw JSON string,
         :return: a datacube containing the requested data
