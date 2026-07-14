@@ -20,6 +20,68 @@ def test_local_collection_metadata(tmp_path_factory):
     local_conn = LocalConnection([sample_netcdf.as_posix(),sample_geotiff.as_posix()])
     assert len(local_conn.list_collections()) == 2
 
+
+@pytest.mark.skipif(
+    not LocalConnection, reason="environment does not support localprocessing"
+)
+def test_load_stac_registry_honors_monkeypatch(monkeypatch):
+    from openeo.local.processing import PROCESS_REGISTRY
+    from openeo_processes_dask.process_implementations.cubes import load
+
+    sentinel = object()
+
+    def patched_load_stac(*args, **kwargs):
+        assert args == ()
+        assert kwargs == {'url': 'https://example.test/catalog'}
+        return sentinel
+
+    monkeypatch.setattr(load, 'load_stac', patched_load_stac)
+
+    assert PROCESS_REGISTRY['load_stac'].implementation(url='https://example.test/catalog') is sentinel
+
+
+@pytest.mark.skipif(
+    not LocalConnection, reason="environment does not support localprocessing"
+)
+def test_load_local_collection_returns_dataset(tmp_path_factory):
+    """load_local_collection returns Dataset for NetCDF files."""
+    from openeo.local.processing import load_local_collection
+    sample_dir = create_local_data(tmp_path_factory, 2, 2, 2, 'netcdf')
+    result = load_local_collection(id=str(sample_dir / 'sample_data.nc'))
+    assert isinstance(result, xr.Dataset)
+    assert 'temperature' in result.data_vars
+    assert 'precipitation' in result.data_vars
+
+
+@pytest.mark.skipif(
+    not LocalConnection, reason="environment does not support localprocessing"
+)
+def test_load_local_collection_tiff_returns_dataset(tmp_path_factory):
+    """load_local_collection returns Dataset for GeoTIFF files."""
+    from openeo.local.processing import load_local_collection
+    sample_dir = create_local_data(tmp_path_factory, 2, 2, 2, 'tiff')
+    result = load_local_collection(id=str(sample_dir / 'sample_data.tiff'))
+    assert isinstance(result, xr.Dataset)
+
+
+@pytest.mark.skipif(
+    not LocalConnection, reason="environment does not support localprocessing"
+)
+def test_execute_returns_dataset(tmp_path_factory):
+    """LocalConnection.execute() returns a Dataset for a load_collection graph."""
+    sample_dir = create_local_data(tmp_path_factory, 2, 2, 2, 'netcdf')
+    local_conn = LocalConnection(sample_dir.as_posix())
+    flat_graph = {
+        "loadcol": {
+            "process_id": "load_collection",
+            "arguments": {"id": str(sample_dir / "sample_data.nc")},
+            "result": True,
+        }
+    }
+    result = local_conn.execute(flat_graph)
+    assert isinstance(result, xr.Dataset)
+    assert 'temperature' in result.data_vars or 'precipitation' in result.data_vars
+
 def create_local_data(tmp_path_factory,lat_size,lon_size,t_size,file_format):
     np.random.seed(0)
     lon = np.linspace(10.5,11.5,lon_size)
